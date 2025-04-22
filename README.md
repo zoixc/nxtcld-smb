@@ -1,5 +1,6 @@
 # nxtcld-smb
-Vanilla Nextcloud image with Samba included
+
+This repo was vibe-coded with ChatGPT.
 
 Custom Docker image based on `nextcloud:stable` with added packages like:
 
