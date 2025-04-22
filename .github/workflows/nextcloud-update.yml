@@ -24,13 +24,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Pull latest nextcloud
+      - name: Pull latest nextcloud base image
         run: docker pull nextcloud:latest
 
-      - name: Build custom image
+      - name: Build custom Nextcloud image
         run: |
-          docker build -t $IMAGE_NAME:latest .
+          docker build \
+            --build-arg BASE_IMAGE=nextcloud:latest \
+            -t $IMAGE_NAME:latest .
 
-      - name: Push image to Docker Hub
-        run: |
-          docker push $IMAGE_NAME:latest
+      - name: Push custom image to Docker Hub
+        run: docker push $IMAGE_NAME:latest
