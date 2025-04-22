@@ -1,20 +1,9 @@
-# macOS system files
 .DS_Store
-
-# Docker volumes and environment
 diun/data/
 .env
 *.log
-
-# VS Code settings
 .vscode/
-
-# Node.js (на всякий случай, если будешь что-то дописывать)
 node_modules/
-
-# Python cache
 __pycache__/
 *.pyc
-
-# GitHub Actions cache/logs (на случай отладки)
 .github/workflows/*.log
