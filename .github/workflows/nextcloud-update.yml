@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      IMAGE_NAME: yourusername/your-custom-nextcloud  # замените на своё имя образа
+      IMAGE_NAME: ptabi/nxtcld-smb
 
     steps:
       - name: Checkout repository
