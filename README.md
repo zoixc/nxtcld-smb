@@ -6,7 +6,6 @@ Custom Docker image based on `nextcloud:stable` with added packages like:
 
 - `smbclient` (for external storage)
 - `libsmbclient-dev`
-- `libldap-2.4-2`
 - `ffmpeg`, `libreoffice`, `ghostscript` (for previews and docs)
 
 ## 🔄 Auto Rebuild Workflow
