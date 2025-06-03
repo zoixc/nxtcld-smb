@@ -7,6 +7,8 @@ on:
       - main
   repository_dispatch:
     types: [nextcloud_update]
+  schedule:
+    - cron: '0 */6 * * *' # every 6 hours
 
 jobs:
   build:
@@ -16,18 +18,61 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Get latest nextcloud:stable digest
+        id: get_digest
+        run: |
+          DIGEST=$(curl -s -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+            "https://registry.hub.docker.com/v2/library/nextcloud/manifests/stable" \
+            | jq -r '.config.digest')
+          echo "digest=$DIGEST" >> $GITHUB_OUTPUT
+
+      - name: Cache last base digest
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: .base_digest
+          key: nextcloud-stable-${{ steps.get_digest.outputs.digest }}
+
+      - name: Check if base image digest changed
+        id: compare_digest
+        run: |
+          # Always build on push or workflow_dispatch
+          if [[ "${{ github.event_name }}" == "push" ]] || [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          if [[ -f .base_digest ]]; then
+            LAST_DIGEST=$(cat .base_digest)
+          else
+            LAST_DIGEST=""
+          fi
+          echo "last_digest=$LAST_DIGEST" >> $GITHUB_OUTPUT
+          if [[ "$LAST_DIGEST" != "${{ steps.get_digest.outputs.digest }}" ]]; then
+            echo "${{ steps.get_digest.outputs.digest }}" > .base_digest
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Set up Docker Buildx
+        if: steps.compare_digest.outputs.changed == 'true'
         uses: docker/setup-buildx-action@v3
 
       - name: Login to DockerHub
+        if: steps.compare_digest.outputs.changed == 'true'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push Docker image
+        if: steps.compare_digest.outputs.changed == 'true'
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: ptabi/nxtcld-smb:latest
+
+      - name: Save updated digest
+        if: steps.compare_digest.outputs.changed == 'true'
+        run: echo "Digest updated and cached."
