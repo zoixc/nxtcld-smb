@@ -10,7 +10,4 @@ Custom Docker image based on `nextcloud:stable` with added packages like:
 
 ## 🔄 Auto Rebuild Workflow
 
-This image is automatically rebuilt and pushed to Docker Hub when a new stable version of the base Nextcloud image is released, using:
-
-- [Diun](https://crazymax.dev/diun/) to detect image updates
-- GitHub Actions to build and push the new custom image
+This image is automatically rebuilt and pushed to Docker Hub when a new stable version of the base Nextcloud image is released, using GitHub Actions to check for the base image update every 24 hours, and when the changes detected, build and push the new custom image.
