@@ -21,14 +21,38 @@ jobs:
       - name: Get latest nextcloud:stable creation date
         id: get_created
         run: |
+          set -e
+          export TAG=stable
+          MANIFEST_LIST=$(curl -s -H "Accept: application/vnd.docker.distribution.manifest.list.v2+json" \
+            "https://registry.hub.docker.com/v2/library/nextcloud/manifests/$TAG")
+          
+          # Try to get the manifest list's first entry (linux/amd64)
+          MANIFEST_DIGEST=$(echo "$MANIFEST_LIST" | \
+            jq -r '.manifests[] | select(.platform.architecture=="amd64" and .platform.os=="linux") | .digest' | head -n1)
+          if [ -z "$MANIFEST_DIGEST" ]; then
+            # fallback: try to get the single manifest
+            MANIFEST_DIGEST=$(echo "$MANIFEST_LIST" | jq -r '.config.digest' || true)
+          fi
+
+          if [ -z "$MANIFEST_DIGEST" ]; then
+            echo "Could not find manifest digest for linux/amd64"
+            exit 1
+          fi
+
+          # Get the config digest from the manifest
           MANIFEST=$(curl -s -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
-            "https://registry.hub.docker.com/v2/library/nextcloud/manifests/stable")
-          # Get config digest
+            "https://registry.hub.docker.com/v2/library/nextcloud/manifests/$MANIFEST_DIGEST")
           CONFIG_DIGEST=$(echo "$MANIFEST" | jq -r '.config.digest')
-          # Get config (contains creation date)
+
           CONFIG_BLOB=$(curl -s -L \
             "https://registry.hub.docker.com/v2/library/nextcloud/blobs/$CONFIG_DIGEST")
-          CREATED=$(echo "$CONFIG_BLOB" | jq -r '.created')
+          CREATED=$(echo "$CONFIG_BLOB" | jq -r '.created // empty')
+
+          if [ -z "$CREATED" ]; then
+            echo "Could not find created date in config blob"
+            exit 1
+          fi
+
           echo "created=$CREATED" >> $GITHUB_OUTPUT
 
       - name: Cache last base image created date
@@ -41,7 +65,7 @@ jobs:
       - name: Check if base image creation date changed
         id: compare_created
         run: |
-          # Always build on push or workflow_dispatch or repository_dispatch
+          # Always build on push, workflow_dispatch, or repository_dispatch
           if [[ "${{ github.event_name }}" == "push" ]] || [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
             echo "changed=true" >> $GITHUB_OUTPUT
             exit 0
