@@ -8,7 +8,7 @@ on:
   repository_dispatch:
     types: [nextcloud_update]
   schedule:
-    - cron: '0 */24 * * *' # every 6 hours
+    - cron: '0 */24 * * *' # every 24 hours
 
 jobs:
   build:
@@ -18,61 +18,66 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Get latest nextcloud:stable digest
-        id: get_digest
+      - name: Get latest nextcloud:stable creation date
+        id: get_created
         run: |
-          DIGEST=$(curl -s -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
-            "https://registry.hub.docker.com/v2/library/nextcloud/manifests/stable" \
-            | jq -r '.config.digest')
-          echo "digest=$DIGEST" >> $GITHUB_OUTPUT
+          MANIFEST=$(curl -s -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+            "https://registry.hub.docker.com/v2/library/nextcloud/manifests/stable")
+          # Get config digest
+          CONFIG_DIGEST=$(echo "$MANIFEST" | jq -r '.config.digest')
+          # Get config (contains creation date)
+          CONFIG_BLOB=$(curl -s -L \
+            "https://registry.hub.docker.com/v2/library/nextcloud/blobs/$CONFIG_DIGEST")
+          CREATED=$(echo "$CONFIG_BLOB" | jq -r '.created')
+          echo "created=$CREATED" >> $GITHUB_OUTPUT
 
-      - name: Cache last base digest
+      - name: Cache last base image created date
         id: cache
         uses: actions/cache@v4
         with:
-          path: .base_digest
-          key: nextcloud-stable-${{ steps.get_digest.outputs.digest }}
+          path: .base_created
+          key: nextcloud-stable-${{ steps.get_created.outputs.created }}
 
-      - name: Check if base image digest changed
-        id: compare_digest
+      - name: Check if base image creation date changed
+        id: compare_created
         run: |
-          # Always build on push or workflow_dispatch
+          # Always build on push or workflow_dispatch or repository_dispatch
           if [[ "${{ github.event_name }}" == "push" ]] || [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
             echo "changed=true" >> $GITHUB_OUTPUT
             exit 0
           fi
-          if [[ -f .base_digest ]]; then
-            LAST_DIGEST=$(cat .base_digest)
+          if [[ -f .base_created ]]; then
+            LAST_CREATED=$(cat .base_created)
           else
-            LAST_DIGEST=""
+            LAST_CREATED=""
           fi
-          echo "last_digest=$LAST_DIGEST" >> $GITHUB_OUTPUT
-          if [[ "$LAST_DIGEST" != "${{ steps.get_digest.outputs.digest }}" ]]; then
-            echo "${{ steps.get_digest.outputs.digest }}" > .base_digest
+          echo "last_created=$LAST_CREATED" >> $GITHUB_OUTPUT
+          if [[ "$LAST_CREATED" != "${{ steps.get_created.outputs.created }}" ]]; then
+            echo "${{ steps.get_created.outputs.created }}" > .base_created
             echo "changed=true" >> $GITHUB_OUTPUT
           else
             echo "changed=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Set up Docker Buildx
-        if: steps.compare_digest.outputs.changed == 'true'
+        if: steps.compare_created.outputs.changed == 'true'
         uses: docker/setup-buildx-action@v3
 
       - name: Login to DockerHub
-        if: steps.compare_digest.outputs.changed == 'true'
+        if: steps.compare_created.outputs.changed == 'true'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push Docker image
-        if: steps.compare_digest.outputs.changed == 'true'
+        if: steps.compare_created.outputs.changed == 'true'
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: ptabi/nxtcld-smb:latest
 
-      - name: Save updated digest
-        if: steps.compare_digest.outputs.changed == 'true'
-        run: echo "Digest updated and cached."
+      - name: Save updated created date
+        if: steps.compare_created.outputs.changed == 'true'
+        run: echo "${{ steps.get_created.outputs.created }}" > .base_created
