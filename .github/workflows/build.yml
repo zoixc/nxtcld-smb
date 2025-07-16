@@ -5,8 +5,6 @@ on:
   push:
     branches:
       - main
-  repository_dispatch:
-    types: [nextcloud_update]
   schedule:
     - cron: '0 */24 * * *' # every 24 hours
 
@@ -18,90 +16,61 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Get latest nextcloud:stable creation date
-        id: get_created
+      - name: Get latest nextcloud:stable digest
+        id: get_digest
         run: |
           set -e
-          export TAG=stable
-          MANIFEST_LIST=$(curl -s -H "Accept: application/vnd.docker.distribution.manifest.list.v2+json" \
-            "https://registry.hub.docker.com/v2/library/nextcloud/manifests/$TAG")
-          
-          # Try to get the manifest list's first entry (linux/amd64)
-          MANIFEST_DIGEST=$(echo "$MANIFEST_LIST" | \
-            jq -r '.manifests[] | select(.platform.architecture=="amd64" and .platform.os=="linux") | .digest' | head -n1)
-          if [ -z "$MANIFEST_DIGEST" ]; then
-            # fallback: try to get the single manifest
-            MANIFEST_DIGEST=$(echo "$MANIFEST_LIST" | jq -r '.config.digest' || true)
-          fi
-
-          if [ -z "$MANIFEST_DIGEST" ]; then
-            echo "Could not find manifest digest for linux/amd64"
+          DIGEST=$(curl -s -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+            "https://registry.hub.docker.com/v2/library/nextcloud/manifests/stable" \
+            | jq -r '.config.digest')
+          if [ -z "$DIGEST" ]; then
+            echo "Could not find digest for nextcloud:stable"
             exit 1
           fi
+          echo "digest=$DIGEST" >> $GITHUB_OUTPUT
 
-          # Get the config digest from the manifest
-          MANIFEST=$(curl -s -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
-            "https://registry.hub.docker.com/v2/library/nextcloud/manifests/$MANIFEST_DIGEST")
-          CONFIG_DIGEST=$(echo "$MANIFEST" | jq -r '.config.digest')
-
-          CONFIG_BLOB=$(curl -s -L \
-            "https://registry.hub.docker.com/v2/library/nextcloud/blobs/$CONFIG_DIGEST")
-          CREATED=$(echo "$CONFIG_BLOB" | jq -r '.created // empty')
-
-          if [ -z "$CREATED" ]; then
-            echo "Could not find created date in config blob"
-            exit 1
-          fi
-
-          echo "created=$CREATED" >> $GITHUB_OUTPUT
-
-      - name: Cache last base image created date
-        id: cache
+      - name: Cache last base image digest
         uses: actions/cache@v4
+        id: cache_digest
         with:
-          path: .base_created
-          key: nextcloud-stable-${{ steps.get_created.outputs.created }}
+          path: .base_digest
+          key: nextcloud-stable-${{ steps.get_digest.outputs.digest }}
 
-      - name: Check if base image creation date changed
-        id: compare_created
+      - name: Check if base image digest changed
+        id: compare_digest
         run: |
-          # Always build on push, workflow_dispatch, or repository_dispatch
-          if [[ "${{ github.event_name }}" == "push" ]] || [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
-            echo "changed=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          if [[ -f .base_created ]]; then
-            LAST_CREATED=$(cat .base_created)
+          if [[ -f .base_digest ]]; then
+            LAST_DIGEST=$(cat .base_digest)
           else
-            LAST_CREATED=""
+            LAST_DIGEST=""
           fi
-          echo "last_created=$LAST_CREATED" >> $GITHUB_OUTPUT
-          if [[ "$LAST_CREATED" != "${{ steps.get_created.outputs.created }}" ]]; then
-            echo "${{ steps.get_created.outputs.created }}" > .base_created
+          echo "last_digest=$LAST_DIGEST" >> $GITHUB_OUTPUT
+          if [[ "$LAST_DIGEST" != "${{ steps.get_digest.outputs.digest }}" ]]; then
+            echo "${{ steps.get_digest.outputs.digest }}" > .base_digest
             echo "changed=true" >> $GITHUB_OUTPUT
           else
             echo "changed=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Set up Docker Buildx
-        if: steps.compare_created.outputs.changed == 'true'
+        if: steps.compare_digest.outputs.changed == 'true'
         uses: docker/setup-buildx-action@v3
 
       - name: Login to DockerHub
-        if: steps.compare_created.outputs.changed == 'true'
+        if: steps.compare_digest.outputs.changed == 'true'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push Docker image
-        if: steps.compare_created.outputs.changed == 'true'
+        if: steps.compare_digest.outputs.changed == 'true'
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: ptabi/nxtcld-smb:latest
 
-      - name: Save updated created date
-        if: steps.compare_created.outputs.changed == 'true'
-        run: echo "${{ steps.get_created.outputs.created }}" > .base_created
+      - name: Save updated digest
+        if: steps.compare_digest.outputs.changed == 'true'
+        run: echo "${{ steps.get_digest.outputs.digest }}" > .base_digest
