@@ -30,14 +30,14 @@ jobs:
           echo "digest=$DIGEST" >> $GITHUB_OUTPUT
 
       - name: Cache last base image digest
-        uses: actions/cache@v4
         id: cache_digest
+        uses: actions/cache@v4
         with:
           path: .base_digest_light
           key: nextcloud-stable-light-${{ steps.get_digest.outputs.digest }}
 
-      - name: Check if base image digest changed
-        id: compare_digest
+      - name: Read last stored digest
+        id: read_last_digest
         run: |
           if [[ -f .base_digest_light ]]; then
             LAST_DIGEST=$(cat .base_digest_light)
@@ -45,8 +45,11 @@ jobs:
             LAST_DIGEST=""
           fi
           echo "last_digest=$LAST_DIGEST" >> $GITHUB_OUTPUT
-          if [[ "$LAST_DIGEST" != "${{ steps.get_digest.outputs.digest }}" ]]; then
-            echo "${{ steps.get_digest.outputs.digest }}" > .base_digest_light
+
+      - name: Check if base image digest changed
+        id: compare_digest
+        run: |
+          if [[ "${{ steps.get_digest.outputs.digest }}" != "${{ steps.read_last_digest.outputs.last_digest }}" ]]; then
             echo "changed=true" >> $GITHUB_OUTPUT
           else
             echo "changed=false" >> $GITHUB_OUTPUT
