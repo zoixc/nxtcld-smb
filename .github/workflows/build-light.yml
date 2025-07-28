@@ -23,18 +23,7 @@ jobs:
           DIGEST=$(curl -s -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
             "https://registry.hub.docker.com/v2/library/nextcloud/manifests/stable" \
             | jq -r '.config.digest')
-          if [ -z "$DIGEST" ]; then
-            echo "Could not find digest for nextcloud:stable"
-            exit 1
-          fi
           echo "digest=$DIGEST" >> $GITHUB_OUTPUT
-
-      - name: Cache last base image digest
-        id: cache_digest
-        uses: actions/cache@v4
-        with:
-          path: .base_digest_light
-          key: nextcloud-stable-light-${{ steps.get_digest.outputs.digest }}
 
       - name: Read last stored digest
         id: read_last_digest
@@ -50,8 +39,10 @@ jobs:
         id: compare_digest
         run: |
           if [[ "${{ steps.get_digest.outputs.digest }}" != "${{ steps.read_last_digest.outputs.last_digest }}" ]]; then
+            echo "Digest changed"
             echo "changed=true" >> $GITHUB_OUTPUT
           else
+            echo "Digest not changed"
             echo "changed=false" >> $GITHUB_OUTPUT
           fi
 
@@ -78,3 +69,12 @@ jobs:
       - name: Save updated digest
         if: steps.compare_digest.outputs.changed == 'true'
         run: echo "${{ steps.get_digest.outputs.digest }}" > .base_digest_light
+
+      - name: Commit digest update
+        if: steps.compare_digest.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add .base_digest_light
+          git commit -m "Update base digest for nextcloud:stable"
+          git push
