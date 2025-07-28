@@ -29,15 +29,8 @@ jobs:
           fi
           echo "digest=$DIGEST" >> $GITHUB_OUTPUT
 
-      - name: Cache last base image digest
-        uses: actions/cache@v4
-        id: cache_digest
-        with:
-          path: .base_digest
-          key: nextcloud-stable-${{ steps.get_digest.outputs.digest }}
-
-      - name: Check if base image digest changed
-        id: compare_digest
+      - name: Read last stored digest
+        id: read_last_digest
         run: |
           if [[ -f .base_digest ]]; then
             LAST_DIGEST=$(cat .base_digest)
@@ -45,10 +38,15 @@ jobs:
             LAST_DIGEST=""
           fi
           echo "last_digest=$LAST_DIGEST" >> $GITHUB_OUTPUT
-          if [[ "$LAST_DIGEST" != "${{ steps.get_digest.outputs.digest }}" ]]; then
-            echo "${{ steps.get_digest.outputs.digest }}" > .base_digest
+
+      - name: Check if base image digest changed
+        id: compare_digest
+        run: |
+          if [[ "${{ steps.get_digest.outputs.digest }}" != "${{ steps.read_last_digest.outputs.last_digest }}" ]]; then
+            echo "Digest changed"
             echo "changed=true" >> $GITHUB_OUTPUT
           else
+            echo "Digest not changed"
             echo "changed=false" >> $GITHUB_OUTPUT
           fi
 
@@ -74,3 +72,12 @@ jobs:
       - name: Save updated digest
         if: steps.compare_digest.outputs.changed == 'true'
         run: echo "${{ steps.get_digest.outputs.digest }}" > .base_digest
+
+      - name: Commit updated digest
+        if: steps.compare_digest.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add .base_digest
+          git commit -m "Update base digest for nextcloud:stable"
+          git push
