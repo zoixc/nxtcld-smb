@@ -1,4 +1,4 @@
-name: Build and Push Multi-Arch Nextcloud SMB Image
+name: Build and Push Nextcloud SMB (latest)
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
     branches:
       - main
   schedule:
-    - cron: '0 */24 * * *'  # каждые 24 часа
+    - cron: '0 */24 * * *'  # каждый день
 
 jobs:
   build:
@@ -23,34 +23,26 @@ jobs:
       - name: Get latest nextcloud:stable digest
         id: get_digest
         run: |
-          set -e
           DIGEST=$(curl -s -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
             "https://registry.hub.docker.com/v2/library/nextcloud/manifests/stable" \
             | jq -r '.config.digest')
-          if [ -z "$DIGEST" ]; then
-            echo "Could not find digest for nextcloud:stable"
-            exit 1
-          fi
           echo "digest=$DIGEST" >> $GITHUB_OUTPUT
 
       - name: Read last stored digest
         id: read_last_digest
         run: |
           if [[ -f .base_digest ]]; then
-            LAST_DIGEST=$(cat .base_digest)
+            echo "last_digest=$(cat .base_digest)" >> $GITHUB_OUTPUT
           else
-            LAST_DIGEST=""
+            echo "last_digest=" >> $GITHUB_OUTPUT
           fi
-          echo "last_digest=$LAST_DIGEST" >> $GITHUB_OUTPUT
 
       - name: Check if base image digest changed
         id: compare_digest
         run: |
           if [[ "${{ steps.get_digest.outputs.digest }}" != "${{ steps.read_last_digest.outputs.last_digest }}" ]]; then
-            echo "Digest changed"
             echo "changed=true" >> $GITHUB_OUTPUT
           else
-            echo "Digest not changed"
             echo "changed=false" >> $GITHUB_OUTPUT
           fi
 
@@ -71,11 +63,12 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push Docker image (multi-arch)
+      - name: Build and push multi-arch Docker image
         if: steps.compare_digest.outputs.changed == 'true'
         uses: docker/build-push-action@v5
         with:
           context: .
+          file: ./Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           tags: |
@@ -102,7 +95,7 @@ jobs:
           curl -sSL https://github.com/google/go-containerregistry/releases/latest/download/go-containerregistry_Linux_x86_64.tar.gz \
           | tar -xz -C /usr/local/bin crane
 
-      - name: Delete old Docker tags (older than 10 days)
+      - name: Delete old date-based Docker tags (older than 10 days)
         if: steps.compare_digest.outputs.changed == 'true'
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
