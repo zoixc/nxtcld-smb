@@ -28,8 +28,8 @@ jobs:
       - name: Read last stored digest
         id: read_last_digest
         run: |
-          if [[ -f .base_digest ]]; then
-            echo "last_digest=$(cat .base_digest)" >> $GITHUB_OUTPUT
+          if [[ -f .base_digest_light ]]; then
+            echo "last_digest=$(cat .base_digest_light)" >> $GITHUB_OUTPUT
           else
             echo "last_digest=" >> $GITHUB_OUTPUT
           fi
@@ -74,7 +74,7 @@ jobs:
 
       - name: Save updated digest
         if: steps.compare_digest.outputs.changed == 'true'
-        run: echo "${{ steps.get_digest.outputs.digest }}" > .base_digest
+        run: echo "${{ steps.get_digest.outputs.digest }}" > .base_digest_light
 
       - name: Commit updated digest
         if: steps.compare_digest.outputs.changed == 'true'
@@ -82,7 +82,7 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git pull --rebase
-          git add .base_digest
+          git add .base_digest_light
           git commit -m "Update base digest for nextcloud:stable"
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
 
