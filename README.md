@@ -13,7 +13,68 @@ Custom Docker image based on `nextcloud:stable` with added packages like:
 This image is automatically rebuilt and pushed to Docker Hub when a new stable version of the base Nextcloud image is released, using GitHub Actions to check for the base image update every 24 hours, and when the changes detected, build and push the new custom image.
 
 ## Installation
-Check `docker-compose-example.yml` file in the repo to see an example working config with mariadb and redis.
+<details>
+  <summary>Spin up this docker-compose.yml file to get Nextcloud + MariaDB + redis instance running</summary>
+
+
+```  
+services:
+  nextcloud:
+    image: ptabi/nxtcld-smb:latest
+    #image: nextcloud:stable
+    container_name: nextcloud
+    restart: unless-stopped
+    ports:
+      - "9999:80"
+    volumes:
+      - {your_path}/nextcloud:/var/www/html
+    environment:
+      MYSQL_HOST: db
+      MYSQL_DATABASE: nextcloud
+      MYSQL_USER: nextcloud
+      MYSQL_PASSWORD: your_mysql_password
+      MYSQL_ROOT_PASSWORD: your_mysql_root_password
+      NEXTCLOUD_ADMIN_USER: your_admin_login
+      NEXTCLOUD_ADMIN_PASSWORD: your_admin_password
+      REDIS_HOST: redis
+    depends_on:
+      - db
+      - redis
+    networks:
+      - nextcloud_network
+
+  db:
+    image: mariadb:11.4
+    container_name: nextcloud_db
+    restart: always
+    command: --transaction-isolation=READ-COMMITTED --log-bin=binlog --binlog-format=ROW
+    volumes:
+      - {your_path}/mariadb:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: your_mysql_root_password
+      MYSQL_PASSWORD: your_mysql_password
+      MYSQL_DATABASE: nextcloud
+      MYSQL_USER: nextcloud
+    networks:
+      - nextcloud_network
+
+  redis:
+    image: redis:alpine
+    container_name: redis
+    restart: unless-stopped
+    volumes:
+      - {your_path}/redis:/data
+    networks:
+      - nextcloud_network
+
+networks:
+  nextcloud_network:
+    name: nextcloud_network
+    driver: bridge
+```
+
+</details>
+
 
 ## Fixing issuess
 
