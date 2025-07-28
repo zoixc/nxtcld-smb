@@ -16,44 +16,44 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Get latest nextcloud:latest digest
-        id: get_digest
-        run: |
-          set -e
-          DIGEST=$(curl -s -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
-            "https://registry.hub.docker.com/v2/library/nextcloud/manifests/latest" \
-            | jq -r '.config.digest')
-          if [ -z "$DIGEST" ]; then
-            echo "Could not find digest for nextcloud:latest"
-            exit 1
-          fi
-          echo "digest=$DIGEST" >> $GITHUB_OUTPUT
+#      - name: Get latest nextcloud:latest digest
+#        id: get_digest
+#        run: |
+#          set -e
+#          DIGEST=$(curl -s -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+#            "https://registry.hub.docker.com/v2/library/nextcloud/manifests/latest" \
+#            | jq -r '.config.digest')
+#          if [ -z "$DIGEST" ]; then
+#            echo "Could not find digest for nextcloud:latest"
+#            exit 1
+#          fi
+#          echo "digest=$DIGEST" >> $GITHUB_OUTPUT
 
-      - name: Cache last base image digest
-        id: cache_digest
-        uses: actions/cache@v4
-        with:
-          path: .base_digest_light
-          key: nextcloud-latest-light-${{ steps.get_digest.outputs.digest }}
+#      - name: Cache last base image digest
+#        id: cache_digest
+#        uses: actions/cache@v4
+#        with:
+#          path: .base_digest_light
+#          key: nextcloud-latest-light-${{ steps.get_digest.outputs.digest }}
 
-      - name: Read last stored digest
-        id: read_last_digest
-        run: |
-          if [[ -f .base_digest_light ]]; then
-            LAST_DIGEST=$(cat .base_digest_light)
-          else
-            LAST_DIGEST=""
-          fi
-          echo "last_digest=$LAST_DIGEST" >> $GITHUB_OUTPUT
-
-      - name: Check if base image digest changed
-        id: compare_digest
-        run: |
-          if [[ "${{ steps.get_digest.outputs.digest }}" != "${{ steps.read_last_digest.outputs.last_digest }}" ]]; then
-            echo "changed=true" >> $GITHUB_OUTPUT
-          else
-            echo "changed=false" >> $GITHUB_OUTPUT
-          fi
+#      - name: Read last stored digest
+#        id: read_last_digest
+#        run: |
+#          if [[ -f .base_digest_light ]]; then
+#            LAST_DIGEST=$(cat .base_digest_light)
+#          else
+#            LAST_DIGEST=""
+#          fi
+#          echo "last_digest=$LAST_DIGEST" >> $GITHUB_OUTPUT
+#
+#      - name: Check if base image digest changed
+#        id: compare_digest
+#        run: |
+#          if [[ "${{ steps.get_digest.outputs.digest }}" != "${{ steps.read_last_digest.outputs.last_digest }}" ]]; then
+#            echo "changed=true" >> $GITHUB_OUTPUT
+#          else
+#            echo "changed=false" >> $GITHUB_OUTPUT
+#          fi
 
       - name: Set up Docker Buildx
         if: steps.compare_digest.outputs.changed == 'true'
