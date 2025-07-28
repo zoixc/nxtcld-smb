@@ -76,7 +76,7 @@ networks:
 </details>
 
 
-## Fixing issuess
+## Fixing issues
 
 1. To launch Cron background tasks worker run in your terminal: 
 ```
