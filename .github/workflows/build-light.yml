@@ -3,7 +3,7 @@ name: Build and Push Nextcloud SMB (light)
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */24 * * *'  # ежедневно
+    - cron: '0 */24 * * *'  # раз в сутки
 
 jobs:
   build:
@@ -20,27 +20,27 @@ jobs:
       - name: Get latest nextcloud:stable digest
         id: get_digest
         run: |
-          set -e
           DIGEST=$(curl -fsSL -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
             "https://registry.hub.docker.com/v2/library/nextcloud/manifests/stable" \
             | jq -r '.config.digest')
 
           if [[ -z "$DIGEST" || "$DIGEST" == "null" ]]; then
-            echo "ERROR: Unable to retrieve valid digest." >&2
+            echo "❌ Failed to get valid digest from Docker Hub"
             exit 1
           fi
 
+          echo "✅ Got digest: $DIGEST"
           echo "digest=$DIGEST" >> $GITHUB_OUTPUT
 
       - name: Read last stored digest
         id: read_last_digest
         run: |
           if [[ -f .base_digest_light ]]; then
-            LAST=$(cat .base_digest_light)
+            LAST_DIGEST=$(cat .base_digest_light)
+            echo "last_digest=$LAST_DIGEST" >> $GITHUB_OUTPUT
           else
-            LAST=""
+            echo "last_digest=" >> $GITHUB_OUTPUT
           fi
-          echo "last_digest=$LAST" >> $GITHUB_OUTPUT
 
       - name: Check if base image digest changed
         id: compare_digest
@@ -73,12 +73,12 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
+          file: ./Dockerfile.light
           push: true
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           tags: |
-            ptabi/nxtcld-smb:latest
-            ptabi/nxtcld-smb:${{ steps.date.outputs.today }}
+            ptabi/nxtcld-smb:light
+            ptabi/nxtcld-smb:light-${{ steps.date.outputs.today }}
 
       - name: Save updated digest
         if: steps.compare_digest.outputs.changed == 'true'
@@ -89,7 +89,15 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git pull --rebase || true
+
+          CHANGES=$(git status --porcelain | grep -v ".base_digest_light" || true)
+          if [[ -n "$CHANGES" ]]; then
+            echo "❌ Detected unstaged changes in repository — aborting commit"
+            git status
+            exit 1
+          fi
+
+          git pull --rebase
           git add .base_digest_light
           git commit -m "Update base digest for nextcloud:stable"
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
