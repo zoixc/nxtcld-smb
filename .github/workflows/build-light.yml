@@ -21,12 +21,12 @@ jobs:
         id: get_digest
         run: |
           set -e
-          DIGEST=$(curl -s -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+          DIGEST=$(curl -fsSL -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
             "https://registry.hub.docker.com/v2/library/nextcloud/manifests/stable" \
             | jq -r '.config.digest')
 
-          if [ -z "$DIGEST" ] || [ "$DIGEST" = "null" ]; then
-            echo "ERROR: Could not get valid digest"
+          if [[ -z "$DIGEST" || "$DIGEST" == "null" ]]; then
+            echo "ERROR: Unable to retrieve valid digest." >&2
             exit 1
           fi
 
@@ -36,10 +36,11 @@ jobs:
         id: read_last_digest
         run: |
           if [[ -f .base_digest_light ]]; then
-            echo "last_digest=$(cat .base_digest_light)" >> $GITHUB_OUTPUT
+            LAST=$(cat .base_digest_light)
           else
-            echo "last_digest=" >> $GITHUB_OUTPUT
+            LAST=""
           fi
+          echo "last_digest=$LAST" >> $GITHUB_OUTPUT
 
       - name: Check if base image digest changed
         id: compare_digest
@@ -81,15 +82,14 @@ jobs:
 
       - name: Save updated digest
         if: steps.compare_digest.outputs.changed == 'true'
-        run: |
-          echo "${{ steps.get_digest.outputs.digest }}" > .base_digest_light
+        run: echo "${{ steps.get_digest.outputs.digest }}" > .base_digest_light
 
       - name: Commit updated digest
         if: steps.compare_digest.outputs.changed == 'true'
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git pull --rebase
+          git pull --rebase || true
           git add .base_digest_light
           git commit -m "Update base digest for nextcloud:stable"
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
