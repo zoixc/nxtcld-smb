@@ -3,7 +3,7 @@ name: Build and Push Nextcloud SMB (latest)
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */24 * * *'  # каждый день
+    - cron: '0 2 * * *'  # Раз в сутки в 02:00 UTC
 
 jobs:
   build:
@@ -17,12 +17,22 @@ jobs:
         id: date
         run: echo "today=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
 
+      - name: Set up Docker Buildx (for digest check)
+        uses: docker/setup-buildx-action@v3
+        with:
+          install: true
+
       - name: Get latest nextcloud:stable digest
         id: get_digest
         run: |
-          DIGEST=$(curl -s -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
-            "https://registry.hub.docker.com/v2/library/nextcloud/manifests/stable" \
-            | jq -r '.config.digest')
+          DIGEST=$(docker buildx imagetools inspect nextcloud:stable \
+            | grep '^Digest:' | awk '{print $2}')
+
+          if [[ -z "$DIGEST" || "$DIGEST" == "null" ]]; then
+            echo "❌ Failed to get valid digest from Docker Hub"
+            exit 1
+          fi
+
           echo "digest=$DIGEST" >> $GITHUB_OUTPUT
 
       - name: Read last stored digest
@@ -47,7 +57,7 @@ jobs:
         if: steps.compare_digest.outputs.changed == 'true'
         uses: docker/setup-qemu-action@v3
 
-      - name: Set up Docker Buildx
+      - name: Set up Docker Buildx (for build)
         if: steps.compare_digest.outputs.changed == 'true'
         uses: docker/setup-buildx-action@v3
         with:
@@ -70,7 +80,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           tags: |
             ptabi/nxtcld-smb:latest
-            ptabi/nxtcld-smb:${{ steps.date.outputs.today }}
+            ptabi/nxtcld-smb:latest-${{ steps.date.outputs.today }}
 
       - name: Save updated digest
         if: steps.compare_digest.outputs.changed == 'true'
@@ -81,7 +91,7 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git pull --rebase
+          git pull --rebase || git fetch --all
           git add .base_digest
           git commit -m "Update base digest for nextcloud:stable"
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
@@ -92,24 +102,25 @@ jobs:
           curl -sSL https://github.com/google/go-containerregistry/releases/latest/download/go-containerregistry_Linux_x86_64.tar.gz \
           | tar -xz -C /usr/local/bin crane
 
-      - name: Delete old date-based Docker tags (older than 10 days)
-        if: steps.compare_digest.outputs.changed == 'true'
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: |
-          IMAGE=ptabi/nxtcld-smb
-          crane ls $IMAGE --auth basic --username=$DOCKERHUB_USERNAME --password=$DOCKERHUB_TOKEN > tags.txt
+#      - name: Delete old date-based Docker tags (older than 10 days)
+#        if: steps.compare_digest.outputs.changed == 'true'
+#        env:
+#          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+#          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+#        run: |
+#          IMAGE=ptabi/nxtcld-smb
+#          crane ls $IMAGE --auth basic --username=$DOCKERHUB_USERNAME --password=$DOCKERHUB_TOKEN > tags.txt
 
-          NOW=$(date +%s)
-          while IFS= read -r TAG; do
-            if [[ "$TAG" == "latest" ]]; then continue; fi
-            if [[ "$TAG" =~ ^[0-9]{8}$ ]]; then
-              TAG_TS=$(date -d "$TAG" +%s 2>/dev/null || echo 0)
-              AGE=$(( (NOW - TAG_TS) / 86400 ))
-              if (( AGE > 10 )); then
-                echo "Deleting old tag: $TAG"
-                crane delete $IMAGE:$TAG --auth basic --username=$DOCKERHUB_USERNAME --password=$DOCKERHUB_TOKEN
-              fi
-            fi
-          done < tags.txt
+#          NOW=$(date +%s)
+#          while IFS= read -r TAG; do
+#            if [[ "$TAG" == "latest" ]]; then continue; fi
+#            if [[ "$TAG" =~ ^latest-[0-9]{8}$ ]]; then
+#              TAG_DATE="${TAG#latest-}"
+#              TAG_TS=$(date -d "$TAG_DATE" +%s 2>/dev/null || echo 0)
+#              AGE=$(( (NOW - TAG_TS) / 86400 ))
+#              if (( AGE > 10 )); then
+#                echo "Deleting old tag: $TAG"
+#                crane delete $IMAGE:$TAG --auth basic --username=$DOCKERHUB_USERNAME --password=$DOCKERHUB_TOKEN
+#              fi
+#            fi
+#          done < tags.txt
