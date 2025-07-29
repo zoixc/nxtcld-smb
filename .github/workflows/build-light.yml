@@ -22,11 +22,11 @@ jobs:
         with:
           install: true
 
-      - name: Get latest nextcloud:stable digest
+      - name: Get latest nextcloud:stable digest (amd64)
         id: get_digest
         run: |
-          docker buildx imagetools inspect nextcloud:stable --format '{{index .Manifest "digest"}}' > digest.txt
-          DIGEST=$(cat digest.txt | tr -d '\n')
+          DIGEST=$(docker buildx imagetools inspect nextcloud:stable \
+            --format '{{range .Manifest.Manifests}}{{if eq .Platform.architecture "amd64"}}{{.Digest}}{{end}}{{end}}')
 
           if [[ -z "$DIGEST" || "$DIGEST" == "null" ]]; then
             echo "❌ Failed to get valid digest from Docker Hub"
