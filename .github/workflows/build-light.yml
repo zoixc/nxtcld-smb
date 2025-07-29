@@ -3,7 +3,7 @@ name: Build and Push Nextcloud SMB (latest)
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */24 * * *'  # каждый день
+    - cron: '0 */24 * * *'  # ежедневно
 
 jobs:
   build:
@@ -20,9 +20,16 @@ jobs:
       - name: Get latest nextcloud:stable digest
         id: get_digest
         run: |
+          set -e
           DIGEST=$(curl -s -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
             "https://registry.hub.docker.com/v2/library/nextcloud/manifests/stable" \
             | jq -r '.config.digest')
+
+          if [ -z "$DIGEST" ] || [ "$DIGEST" = "null" ]; then
+            echo "ERROR: Could not get valid digest"
+            exit 1
+          fi
+
           echo "digest=$DIGEST" >> $GITHUB_OUTPUT
 
       - name: Read last stored digest
@@ -65,16 +72,17 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile.light
+          file: ./Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           tags: |
-            ptabi/nxtcld-smb:light
-            ptabi/nxtcld-smb:light-${{ steps.date.outputs.today }}
+            ptabi/nxtcld-smb:latest
+            ptabi/nxtcld-smb:${{ steps.date.outputs.today }}
 
       - name: Save updated digest
         if: steps.compare_digest.outputs.changed == 'true'
-        run: echo "${{ steps.get_digest.outputs.digest }}" > .base_digest_light
+        run: |
+          echo "${{ steps.get_digest.outputs.digest }}" > .base_digest_light
 
       - name: Commit updated digest
         if: steps.compare_digest.outputs.changed == 'true'
