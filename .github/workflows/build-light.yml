@@ -102,25 +102,25 @@ jobs:
           curl -sSL https://github.com/google/go-containerregistry/releases/latest/download/go-containerregistry_Linux_x86_64.tar.gz \
           | tar -xz -C /usr/local/bin crane
 
-      - name: Delete old date-based Docker tags (older than 10 days)
-        if: steps.compare_digest.outputs.changed == 'true'
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: |
-          IMAGE=ptabi/nxtcld-smb
-          crane ls $IMAGE --auth basic --username=$DOCKERHUB_USERNAME --password=$DOCKERHUB_TOKEN > tags.txt
+#      - name: Delete old date-based Docker tags (older than 10 days)
+#        if: steps.compare_digest.outputs.changed == 'true'
+#        env:
+#          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+#          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+#        run: |
+#          IMAGE=ptabi/nxtcld-smb
+#          crane ls $IMAGE --auth basic --username=$DOCKERHUB_USERNAME --password=$DOCKERHUB_TOKEN > tags.txt
 
-          NOW=$(date +%s)
-          while IFS= read -r TAG; do
-            if [[ "$TAG" == "light" ]]; then continue; fi
-            if [[ "$TAG" =~ ^light-[0-9]{8}$ ]]; then
-              TAG_DATE="${TAG#light-}"
-              TAG_TS=$(date -d "$TAG_DATE" +%s 2>/dev/null || echo 0)
-              AGE=$(( (NOW - TAG_TS) / 86400 ))
-              if (( AGE > 10 )); then
-                echo "Deleting old tag: $TAG"
-                crane delete $IMAGE:$TAG --auth basic --username=$DOCKERHUB_USERNAME --password=$DOCKERHUB_TOKEN
-              fi
-            fi
-          done < tags.txt
+#          NOW=$(date +%s)
+#          while IFS= read -r TAG; do
+#            if [[ "$TAG" == "light" ]]; then continue; fi
+#            if [[ "$TAG" =~ ^light-[0-9]{8}$ ]]; then
+#              TAG_DATE="${TAG#light-}"
+#              TAG_TS=$(date -d "$TAG_DATE" +%s 2>/dev/null || echo 0)
+#              AGE=$(( (NOW - TAG_TS) / 86400 ))
+#              if (( AGE > 10 )); then
+#                echo "Deleting old tag: $TAG"
+#                crane delete $IMAGE:$TAG --auth basic --username=$DOCKERHUB_USERNAME --password=$DOCKERHUB_TOKEN
+#              fi
+#            fi
+#          done < tags.txt
