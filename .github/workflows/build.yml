@@ -80,7 +80,6 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           tags: |
             ptabi/nxtcld-smb:latest
-            ptabi/nxtcld-smb:latest-${{ steps.date.outputs.today }}
 
       - name: Save updated digest
         if: steps.compare_digest.outputs.changed == 'true'
