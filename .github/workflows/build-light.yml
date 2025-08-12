@@ -3,7 +3,7 @@ name: Build and Push Nextcloud SMB (light)
 on:
   workflow_dispatch:
   schedule:
-    - cron: '10 6 */3 * *'  # At 06:10 AM, every 3 days
+    - cron: '10 6 */7 * *'  # At 06:10 AM, every 7 days
 
 jobs:
   build:
