@@ -7,4 +7,6 @@ RUN apt-get update && \
         ffmpeg \
         libreoffice \
         ghostscript \
+        geoip-bin \
+        geoip-database \
     && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
