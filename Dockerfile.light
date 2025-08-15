@@ -1,3 +1,4 @@
 FROM nextcloud:stable
 
-RUN apt-get update && apt-get install -y smbclient && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends smbclient geoip-bin geoip-database \
+    && rm -rf /var/lib/apt/lists/*
