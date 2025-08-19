@@ -4,9 +4,9 @@ This repo was vibe-coded with ChatGPT.
 
 Custom Docker image based on `nextcloud:stable` with added packages like:
 
-- `smbclient` (for external storage)
-- `libsmbclient-dev`
-- `ffmpeg`, `libreoffice`, `ghostscript` (for previews and docs)
+- `smbclient`, `libsmbclient-dev` - for external storage
+- `geoip-bin`, `geoip-database` - for GeoBlocker app with GeoIpLookup service (latest DB dated 2025-03-28)
+- `ffmpeg`, `libreoffice`, `ghostscript` - for previews and docs
 
 ## Auto Rebuild Workflow
 
@@ -14,13 +14,13 @@ This image is automatically rebuilt and pushed to Docker Hub when a new stable v
 
 ## Installation
 <details>
-  <summary>Spin up this docker-compose.yml file to get Nextcloud + MariaDB + redis instance running</summary>
+  <summary>Spin up this docker-compose.yml file to get Nextcloud + MariaDB + Valkey instance running</summary>
 
 
 ```  
 services:
   nextcloud:
-    image: ptabi/nxtcld-smb:latest
+    image: ptabi/nxtcld-smb:light
     #image: nextcloud:stable
     container_name: nextcloud
     restart: unless-stopped
@@ -36,15 +36,15 @@ services:
       MYSQL_ROOT_PASSWORD: your_mysql_root_password
       NEXTCLOUD_ADMIN_USER: your_admin_login
       NEXTCLOUD_ADMIN_PASSWORD: your_admin_password
-      REDIS_HOST: redis
+      REDIS_HOST: valkey
     depends_on:
       - db
-      - redis
+      - valkey
     networks:
       - nextcloud_network
 
   db:
-    image: mariadb:11.4
+    image: mariadb:latest #mariadb:11.4 is recommended as the latest image supported by Nextcloud; newer versions will throw a warning in settings but still will work fine (tested)
     container_name: nextcloud_db
     restart: always
     command: --transaction-isolation=READ-COMMITTED --log-bin=binlog --binlog-format=ROW
@@ -58,12 +58,12 @@ services:
     networks:
       - nextcloud_network
 
-  redis:
-    image: redis:alpine
-    container_name: redis
+  valkey:
+    image: valkey/valkey:latest
+    container_name: valkey
     restart: unless-stopped
     volumes:
-      - {your_path}/redis:/data
+      - {your_path}/valkey:/data #if you're transitioning from Redis you can preserve your custom path but you need to delete or rename dump.rdb in that folder and change all of your variables from redis to valkey)
     networks:
       - nextcloud_network
 
@@ -111,7 +111,7 @@ Restart the container:
 sudo docker restart nextcloud
 ```
 
-Add correct headers (for example using NPM) - paste this on the Advanced tab of your host:
+Add correct headers (for example using NPM) - paste this on the Advanced tab of your proxy host:
 
 ```
 add_header X-Content-Type-Options "nosniff" always;
