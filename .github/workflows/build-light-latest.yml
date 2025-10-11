@@ -75,15 +75,15 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile.light
+          file: ./Dockerfile.light.latest
           push: true
           platforms: linux/amd64
           tags: |
-            ptabi/nxtcld-smb:light
+            ptabi/nxtcld-smb:latelight
 
       - name: Save updated digest
         if: steps.compare_digest.outputs.changed == 'true'
-        run: echo "${{ steps.get_digest.outputs.digest }}" > .base_digest_light
+        run: echo "${{ steps.get_digest.outputs.digest }}" > .base_digest_light_latest
 
       - name: Commit updated digest
         if: steps.compare_digest.outputs.changed == 'true'
