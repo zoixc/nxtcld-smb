@@ -1,4 +1,4 @@
-name: Build and Push Nextcloud SMB (light)
+name: Build and Push Nextcloud SMB (light and latest)
 
 on:
   workflow_dispatch:
