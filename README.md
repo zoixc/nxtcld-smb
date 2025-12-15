@@ -8,6 +8,9 @@ Custom Docker image based on `nextcloud:stable` with added packages like:
 - `geoip-bin`, `geoip-database` - for GeoBlocker app with GeoIpLookup service (latest DB dated 2025-03-28)
 - `ffmpeg`, `libreoffice`, `ghostscript` - for previews and docs
 
+There is also a tag for the `latest` release of Nextcloud with GeoIP added to keep up with the freshest updates and features of the base image.
+Use `:latelight` for this.
+
 ## Auto Rebuild Workflow
 
 This image is automatically rebuilt and pushed to Docker Hub when a new stable version of the base Nextcloud image is released, using GitHub Actions to check for the base image update every 24 hours, and when the changes detected, build and push the new custom image.
