@@ -2,14 +2,17 @@
 
 This repo was vibe-coded with ChatGPT.
 
-Custom Docker image based on `nextcloud:stable` with added packages like:
+There are three image tags available: 
+- `:stable`, which uses `nextcloud:stable` image with added `smbclient`, `geoip-bin`, `geoip-database`;
+- `:latelight`, which uses `nextcloud:latest` image with the same additions as `smbclient`, `geoip-bin`, `geoip-database`;
+- `:latest`, which uses `nextcloud:latest` image with more packages: `smbclient`, `libsmbclient-dev`, `ffmpeg`, `libreoffice`, `ghostscript`, `geoip-bin`, `geoip-database`.
 
+Why these?
 - `smbclient`, `libsmbclient-dev` - for external storage
 - `geoip-bin`, `geoip-database` - for GeoBlocker app with GeoIpLookup service (latest DB dated 2025-03-28)
 - `ffmpeg`, `libreoffice`, `ghostscript` - for previews and docs
 
-There is also a tag for the `latest` release of Nextcloud with GeoIP added to keep up with the freshest updates and features of the base image.
-Use `:latelight` for this.
+The image size will be different with each tag, hence choose the most sutable option for you.
 
 ## Auto Rebuild Workflow
 
